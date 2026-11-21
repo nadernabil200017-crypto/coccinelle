@@ -1,18 +1,56 @@
 name: Build APK
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: unzip -o Coccinelle-Android.zip
+      - name: Unzip
+        run: |
+          Z=$(ls coccinelle-github*.zip | head -1)
+          mkdir src && unzip -o "$Z" -d src
+          cd src
+          mkdir -p ../site ../app/src/main/java/com/coccinelle/cp ../app/src/main/assets
+          cp index.html voix-a.json voix-f.json voix-g.json manifest.json sw.js icon-192.png icon-512.png ../site/
+          cp index.html voix-a.json voix-f.json voix-g.json ../app/src/main/assets/
+          for d in mdpi xxhdpi xxxhdpi; do mkdir -p ../app/src/main/res/mipmap-$d; cp ic_launcher-$d.png ../app/src/main/res/mipmap-$d/ic_launcher.png; done
+          cp app.gradle ../app/build.gradle
+          cp coccinelle.keystore ../app/
+          cp AndroidManifest.xml ../app/src/main/
+          cp MainActivity.java ../app/src/main/java/com/coccinelle/cp/
+          cp build.gradle settings.gradle gradle.properties ../
       - uses: actions/setup-java@v4
-        with: {distribution: temurin, java-version: 17}
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
-        with: {gradle-version: "8.7"}
-      - run: gradle assembleRelease
-        working-directory: Coccinelle-Android
+        with:
+          gradle-version: '8.9'
+      - name: Build
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle assembleRelease --no-daemon --stacktrace
+      - name: Rename
+        run: cp app/build/outputs/apk/release/app-release.apk Coccinelle-CP.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Coccinelle-apk
-          path: Coccinelle-Android/app/build/outputs/apk/release/*.apk
+          name: Coccinelle-CP-apk
+          path: Coccinelle-CP.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.${{ github.run_number }}
+          name: Coccinelle CP 1.${{ github.run_number }}
+          files: Coccinelle-CP.apk
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        continue-on-error: true
