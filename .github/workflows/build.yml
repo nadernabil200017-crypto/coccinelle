@@ -12,9 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Unzip
         run: |
-          Z=$(ls coccinelle-github*.zip | head -1)
+          Z=$(git log -1 --name-only --format= --diff-filter=AM -- 'coccinelle-github*.zip' | head -1)
+          [ -f "$Z" ] || Z=$(ls -t coccinelle-github*.zip | head -1)
+          echo "Using $Z"
           mkdir src && unzip -o "$Z" -d src
           cd src
           mkdir -p ../site ../app/src/main/java/com/coccinelle/cp ../app/src/main/assets
